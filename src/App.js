@@ -69,6 +69,10 @@ class App extends Component {
     );
   }
   componentDidMount () {
+    console.log('window.location.pathname', window.location.pathname)
+    console.log('window.location.search', window.location.search)
+    console.log('window.location.href', window.location.href)
+
     let userId = 'default'
 
     db.collection('userAnimes').doc(userId).collection('animes').get()
@@ -85,7 +89,6 @@ class App extends Component {
           */
          docs.push(doc)
         })
-        console.log(docs)
       })
   }
 }

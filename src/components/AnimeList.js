@@ -11,6 +11,7 @@ import Avatar from '@material-ui/core/Avatar';
 import ListItemIcon from '@material-ui/core/ListItemIcon';
 import Icon from '@material-ui/core/Icon';
 import IconButton from '@material-ui/core/IconButton';
+import Button from '@material-ui/core/Button';
 
 import update from 'react-addons-update';
 
@@ -21,25 +22,53 @@ class AnimeList extends Component {
       animes: []
     }
 
+    this.orderBy = 'name'
+
+    this.pagination = {
+      lastVisible: null,
+      currentPage: 1,
+      startAt: 0,
+      perPage: 2
+    }
+
     // this.tooggleFavoriteAnime = this.tooggleFavoriteAnime.bind(this)
   }
-
+  getBasicInfo (anime) {
+    return {
+      name: anime.name,
+      image: anime.image,
+    }
+  }
   tooggleFavoriteAnime = (anime) => {
-    console.log(anime.id)
     let userId = 'default'
     let animeId = anime.id.toString()
+
+    let data = {}
+
     if (anime.like) {
-      db.collection('userAnimes').doc(userId).collection('animes').doc(animeId).delete()
+      // db.collection('userAnimes').doc(userId).collection('animes').doc(animeId).delete()
       anime.like = false
+
+      data = {
+        like: anime.like
+      }
     } else {
-      let data = {
+      anime.like = true
+
+      data = {
         animeRef: `animes/${animeId}`,
         score: 0,
-        anime,
+        state: '',
+        like: anime.like,
+        anime: this.getBasicInfo(anime),
       }
-      db.collection('userAnimes').doc(userId).collection('animes').doc(animeId).set(data)
-      anime.like = true
     }
+    db
+      .collection('userAnimes')
+      .doc(userId)
+      .collection('animes')
+      .doc(animeId)
+      .set(data, { merge: true })
 
     let index = this.state.animes.findIndex(item => item.id === anime.id)
     if (index >= 0) {
@@ -49,7 +78,6 @@ class AnimeList extends Component {
     }
 
   }
-
   render() {
     let { animes } = this.state
 
@@ -69,16 +97,38 @@ class AnimeList extends Component {
             </ListItemSecondaryAction>
           </ListItem>
         )})}
+        <ListItem>
+          <ListItemSecondaryAction>
+            <Button onClick={this.nextPage}>
+              Mas
+            </Button>
+          </ListItemSecondaryAction>
+        </ListItem>
       </List>
     );
   }
-  componentDidMount () {
+  load () {
     let userId = 'default'
 
-    db.collection('animes').get()
+    let q
+    if (this.pagination.currentPage !== 1){
+      q = db.collection('animes')
+        .orderBy(this.orderBy)
+        .limit(this.pagination.perPage)
+        .startAfter(this.pagination.lastVisible)
+    } else {
+      q = db.collection('animes')
+        .orderBy(this.orderBy)
+        .limit(this.pagination.perPage)
+    }
+
+    q.get()
       .then(query => {
         let animes = []
         let promises = []
+
+        this.pagination.lastVisible = query.docs[query.docs.length - 1];
+
         query.forEach(i => {
           let doc = i.data()
           let promise = db.collection('userAnimes').doc(userId).collection('animes').doc(i.id).get()
@@ -95,8 +145,19 @@ class AnimeList extends Component {
           animes.push(doc)
         })
         Promise.all(promises)
-          .then(r => this.setState({ animes }))
+          .then(r => {
+            let newAnimes = this.state.animes.concat(animes)
+            this.setState({ animes: newAnimes })
+          })
       })
+  }
+  nextPage = () => {
+    this.pagination.currentPage += 1
+    this.pagination.startAt += this.pagination.perPage
+    this.load()
+  }
+  componentDidMount () {
+    this.load()
   }
 }
 
